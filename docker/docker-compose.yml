@@ -1,0 +1,63 @@
+services:
+  php:
+    build:
+      context: ./php
+      dockerfile: Dockerfile
+    container_name: facturo-php
+    ports:
+      - "8080:80"
+    volumes:
+      - ..:/var/www/html
+    environment:
+      DB_HOST: mysql
+      DB_NAME: facturo
+      DB_USER: facturo
+      DB_PASS: facturo
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - facturo-net
+
+  mysql:
+    image: mysql:8.0
+    container_name: facturo-mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: facturo
+      MYSQL_USER: facturo
+      MYSQL_PASSWORD: facturo
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ../database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - facturo-net
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: facturo-phpmyadmin
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: facturo
+      PMA_PASSWORD: facturo
+    depends_on:
+      - mysql
+    networks:
+      - facturo-net
+
+volumes:
+  mysql-data:
+
+networks:
+  facturo-net:
+    driver: bridge

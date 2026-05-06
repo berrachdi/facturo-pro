@@ -1,0 +1,6 @@
+/vendor/
+.env
+docker/mysql-data/
+*.log
+.DS_Store
+.idea/
