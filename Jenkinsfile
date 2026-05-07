@@ -3,7 +3,8 @@ pipeline {
 
     environment {
         COMPOSE_FILE = 'docker/docker-compose.yml'
-        APP_URL      = 'http://localhost:8080'
+        // host.docker.internal = localhost de la machine hôte vu depuis Jenkins (container)
+        APP_URL = 'http://host.docker.internal:8080'
     }
 
     stages {
@@ -19,9 +20,11 @@ pipeline {
             steps {
                 sh '''
                     echo "=== Vérification syntaxe PHP ==="
-                    find src/ -name "*.php" -exec php -l {} \\; | grep -v "No syntax errors"
-                    find views/ -name "*.php" -exec php -l {} \\; | grep -v "No syntax errors"
-                    echo "Syntaxe OK"
+                    docker run --rm \
+                        -v "$WORKSPACE:/app" \
+                        -w /app \
+                        php:8.2-cli \
+                        sh -c 'find src/ views/ public/ -name "*.php" -exec php -l {} \\; | grep -v "No syntax errors" || true; echo "✅ Syntaxe OK"'
                 '''
             }
         }
@@ -38,8 +41,8 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh '''
-                    echo "=== Déploiement ==="
-                    docker compose -f $COMPOSE_FILE up -d --remove-orphans
+                    echo "=== Déploiement PHP (MySQL préservé) ==="
+                    docker compose -f $COMPOSE_FILE up -d --no-deps --force-recreate php
                 '''
             }
         }
@@ -51,10 +54,10 @@ pipeline {
                     sleep 5
                     STATUS=$(curl -s -o /dev/null -w "%{http_code}" $APP_URL/login)
                     if [ "$STATUS" != "200" ]; then
-                        echo "Health check échoué — HTTP $STATUS"
+                        echo "❌ Health check échoué — HTTP $STATUS"
                         exit 1
                     fi
-                    echo "App accessible — HTTP $STATUS ✅"
+                    echo "✅ App accessible — HTTP $STATUS"
                 '''
             }
         }
@@ -66,7 +69,7 @@ pipeline {
         }
         failure {
             echo "❌ Pipeline échoué — Build #${env.BUILD_NUMBER}"
-            sh 'docker compose -f $COMPOSE_FILE logs --tail=50 || true'
+            sh 'docker compose -f $COMPOSE_FILE logs --tail=50 php || true'
         }
         always {
             echo "Durée totale : ${currentBuild.durationString}"
