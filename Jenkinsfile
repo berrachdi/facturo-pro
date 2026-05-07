@@ -41,8 +41,8 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh '''
-                    echo "=== Déploiement PHP (MySQL préservé) ==="
-                    docker compose -f $COMPOSE_FILE up -d --no-deps --force-recreate php
+                    echo "=== Déploiement stack complète ==="
+                    docker compose -f $COMPOSE_FILE up -d
                 '''
             }
         }
@@ -50,11 +50,14 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh '''
+                    echo "=== Attente démarrage des containers ==="
+                    sleep 15
                     echo "=== Vérification santé app ==="
-                    sleep 5
                     STATUS=$(curl -s -o /dev/null -w "%{http_code}" $APP_URL/login)
+                    echo "HTTP status : $STATUS"
                     if [ "$STATUS" != "200" ]; then
                         echo "❌ Health check échoué — HTTP $STATUS"
+                        docker compose -f $COMPOSE_FILE logs --tail=20 php
                         exit 1
                     fi
                     echo "✅ App accessible — HTTP $STATUS"
