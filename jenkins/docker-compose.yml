@@ -1,0 +1,19 @@
+services:
+  jenkins:
+    build: .
+    container_name: facturo-jenkins
+    user: root
+    ports:
+      - "8090:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins-data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Même chemin hôte = même chemin container → Docker Daemon peut résoudre les volumes
+      - /home/mohamed-berrachdi/projects/facturo-pro:/home/mohamed-berrachdi/projects/facturo-pro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  jenkins-data:
